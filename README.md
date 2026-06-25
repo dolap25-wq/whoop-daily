@@ -30,12 +30,31 @@ python whoop_daily.py history    # show the last 14 days
 python whoop_daily.py history --days 30
 python whoop_daily.py heatmap    # GitHub-style contribution grid, colored by recovery
 python whoop_daily.py heatmap --weeks 26
+python whoop_daily.py correlate           # correlation analysis across all logged data
+python whoop_daily.py correlate --days 30 # limit to last N days
 ```
 
 `heatmap` renders a Mon-Sun grid (like a GitHub contributions graph) where each
 day is colored by recovery score: green (67%+), yellow (34-66%), red (<34%),
 grey (no data / future). Good for a 2-second glance at recovery trend instead
 of reading numbers.
+
+`correlate` runs a statistical analysis on your logged data and prints a terminal
+report with three sections:
+
+1. **Strain → Next-Day Recovery** — buckets your strain scores (Low / Moderate /
+   High / All-out) and shows the average next-day recovery for each, plus a
+   Pearson correlation with a two-tailed t-test.
+2. **Sleep Duration → Recovery** — same idea bucketed by sleep hours (<6 h, 6–7 h,
+   7–8 h, 8–9 h, 9 h+), with its own correlation test.
+3. **Multiple Regression** — OLS model predicting next-day recovery from
+   yesterday's strain and last night's sleep duration together, with coefficient
+   t-tests, an overall F-test, R², and a VIF multicollinearity check.
+
+Requires at least 10 complete data points per section; shows a friendly warning
+and skips that section if you don't have enough data yet. `scipy` is the only
+non-stdlib dependency added for this command (distribution CDFs only — all matrix
+ops are pure Python).
 
 ## Scheduled run (Windows Task Scheduler)
 
