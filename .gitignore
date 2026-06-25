@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Test cache
+.pytest_cache/
+
+# Internal working docs (not part of the project)
+docs/
+.superpowers/
