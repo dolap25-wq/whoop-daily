@@ -99,6 +99,93 @@ def _sig_stars(p: float) -> str:
     return "(ns)"
 
 
+# ---------------------------------------------------------------------------
+# Insight helpers (pure functions — no I/O, no DB)
+# ---------------------------------------------------------------------------
+
+_SPARK_CHARS = "▁▂▃▄▅▆▇█"
+
+
+def _sparkline(values: list[float | None]) -> str:
+    """Map a sequence of optional floats to a single-line block-char sparkline.
+
+    None entries render as '·'. When all values are the same, the middle
+    block char is used so the line isn't misleadingly flat.
+    """
+    non_none = [v for v in values if v is not None]
+    if not non_none:
+        return "·" * len(values)
+    lo, hi = min(non_none), max(non_none)
+    result = []
+    for v in values:
+        if v is None:
+            result.append("·")
+        elif hi == lo:
+            result.append(_SPARK_CHARS[4])
+        else:
+            idx = round((v - lo) / (hi - lo) * (len(_SPARK_CHARS) - 1))
+            result.append(_SPARK_CHARS[idx])
+    return "".join(result)
+
+
+def _rolling_avg(values: list[float | None], window: int) -> float | None:
+    """Average the last `window` non-None values. Returns None if none exist."""
+    tail = [v for v in values[-window:] if v is not None]
+    return sum(tail) / len(tail) if tail else None
+
+
+def _trend_arrow(vals: list[float | None], threshold: float = 2.0) -> str:
+    """Compare last 7-day avg to prior 7-day avg and return a Rich-markup string."""
+    recent = [v for v in vals[-7:] if v is not None]
+    prior = [v for v in vals[-14:-7] if v is not None]
+    if not recent or not prior:
+        return "[dim]→ (not enough data)[/]"
+    delta = sum(recent) / len(recent) - sum(prior) / len(prior)
+    if delta > threshold:
+        return f"[green]↑ improving[/] (+{delta:.1f})"
+    if delta < -threshold:
+        return f"[red]↓ declining[/] ({delta:.1f})"
+    return f"[yellow]→ flat[/] ({delta:+.1f})"
+
+
+def _find_streaks(rows: list) -> list[list[str]]:
+    """Find all consecutive calendar-day green streaks (recovery_pct >= 67).
+
+    Rows must be sorted ascending by date (as returned by db.fetch_all).
+    Returns a list of streaks; each streak is a list of date strings.
+    """
+    streaks: list[list[str]] = []
+    current: list[str] = []
+    for row in rows:
+        d_str = row["date"]
+        rec = row["recovery_pct"]
+        is_green = rec is not None and float(rec) >= 67.0
+        if is_green:
+            if current:
+                prev_d = date.fromisoformat(current[-1])
+                curr_d = date.fromisoformat(d_str)
+                if (curr_d - prev_d).days == 1:
+                    current.append(d_str)
+                else:
+                    streaks.append(current[:])
+                    current = [d_str]
+            else:
+                current = [d_str]
+        else:
+            if current:
+                streaks.append(current[:])
+                current = []
+    if current:
+        streaks.append(current[:])
+    return streaks
+
+
+def _week_start(date_str: str) -> date:
+    """Return the Monday that starts the calendar week containing date_str."""
+    d = date.fromisoformat(date_str)
+    return d - timedelta(days=d.weekday())
+
+
 def _mat3_inv(m: list[list[float]]) -> list[list[float]]:
     """Invert a 3×3 matrix via cofactor expansion. Raises ValueError if singular."""
     a, b, c = m[0]
