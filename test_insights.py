@@ -270,3 +270,43 @@ def test_run_weekly_sparse_week_excluded_from_best_worst():
     _insert(conn, "2026-06-17", recovery_pct=40.0)
     with patch("whoop_daily.open_db", return_value=conn):
         run_weekly(8)  # should not crash even with sparse data
+
+
+# ── run_streaks smoke tests ────────────────────────────────────────────────
+
+from whoop_daily import run_streaks
+
+
+def test_run_streaks_full_data_no_crash():
+    conn = _make_full_db(30)
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_streaks()
+
+
+def test_run_streaks_empty_db_no_crash():
+    conn = _make_db()
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_streaks()
+
+
+def test_run_streaks_all_green_no_crash():
+    conn = _make_db()
+    for i in range(10):
+        _insert(conn, (date(2026, 1, 1) + timedelta(days=i)).isoformat(), recovery_pct=85.0)
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_streaks()
+
+
+def test_run_streaks_all_red_no_crash():
+    conn = _make_db()
+    for i in range(5):
+        _insert(conn, (date(2026, 1, 1) + timedelta(days=i)).isoformat(), recovery_pct=20.0)
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_streaks()
+
+
+def test_run_streaks_no_records_with_all_metrics_no_crash():
+    conn = _make_db()
+    _insert(conn, "2026-01-01")  # all NULL metrics
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_streaks()

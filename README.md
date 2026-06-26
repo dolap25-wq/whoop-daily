@@ -32,6 +32,11 @@ python whoop_daily.py heatmap    # GitHub-style contribution grid, colored by re
 python whoop_daily.py heatmap --weeks 26
 python whoop_daily.py correlate           # correlation analysis across all logged data
 python whoop_daily.py correlate --days 30 # limit to last N days
+python whoop_daily.py trends             # sparklines + rolling averages + trend direction for recovery, HRV, RHR
+python whoop_daily.py trends --days 60
+python whoop_daily.py weekly             # week-by-week summary table (avg recovery, HRV, sleep, strain)
+python whoop_daily.py weekly --weeks 12
+python whoop_daily.py streaks            # current green streak, top streaks, personal bests
 ```
 
 `heatmap` renders a Mon-Sun grid (like a GitHub contributions graph) where each
@@ -55,6 +60,18 @@ Requires at least 10 complete data points per section; shows a friendly warning
 and skips that section if you don't have enough data yet. `scipy` is the only
 non-stdlib dependency added for this command (distribution CDFs only — all matrix
 ops are pure Python).
+
+`trends` shows three sections: a text sparkline for Recovery, HRV, and RHR (one character per
+logged day using `▁▂▃▄▅▆▇█`); a rolling-averages table with 7/14/28-day windows; and a trend
+direction line (↑ improving / ↓ declining / → flat) comparing your last 7 days to the prior 7.
+
+`weekly` shows a week-by-week summary table (Mon–Sun rows, newest first). Columns: week start,
+avg recovery (color-coded), avg HRV, avg sleep hours, total strain, and days logged out of 7.
+A best/worst week callout appears below the table (only weeks with 3+ logged days qualify).
+
+`streaks` shows your current consecutive green-day streak (recovery ≥ 67%), your top 3 longest
+green streaks ever, and a personal bests panel (best recovery, best HRV, best sleep, lowest RHR,
+highest strain — each with the date it occurred).
 
 ## Scheduled run (Windows Task Scheduler)
 

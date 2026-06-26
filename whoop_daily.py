@@ -801,6 +801,87 @@ def _fmt(value: float | None) -> str:
     return "n/a" if value is None else str(value)
 
 
+def run_streaks() -> None:
+    conn = open_db()
+    rows = db.fetch_all(conn)
+    if not rows:
+        console.print("No history yet - run `today` a few times first.")
+        return
+
+    console.print(Panel.fit("Whoop – Streaks & Personal Bests", style="bold cyan"))
+
+    all_streaks = _find_streaks(rows)
+    all_streaks.sort(key=len, reverse=True)
+
+    today_str = date.today().isoformat()
+    yesterday_str = (date.today() - timedelta(days=1)).isoformat()
+
+    active_streak: list[str] | None = None
+    for streak in all_streaks:
+        if streak[-1] in (today_str, yesterday_str):
+            active_streak = streak
+            break
+
+    # Section 1: Current streak
+    if active_streak:
+        console.print(
+            f"\n  [bold green]Current streak: {len(active_streak)} green day(s)[/]"
+            f"  ({active_streak[0]} → {active_streak[-1]})"
+        )
+    else:
+        by_date = {r["date"]: r["recovery_pct"] for r in rows}
+        last_green = next(
+            (d for d in sorted(by_date, reverse=True)
+             if by_date[d] is not None and float(by_date[d]) >= 67.0),
+            None,
+        )
+        if last_green:
+            days_since = (date.today() - date.fromisoformat(last_green)).days
+            console.print(
+                f"\n  [dim]Current streak: 0 green days"
+                f" — last green was {days_since} day(s) ago ({last_green})[/]"
+            )
+        else:
+            console.print("\n  [dim]Current streak: 0 green days — no green days logged yet[/]")
+
+    # Section 2: Top streaks table
+    top = all_streaks[:3]
+    if top:
+        stbl = Table(title="Top Green Streaks", show_header=True, header_style="bold")
+        stbl.add_column("Rank")
+        stbl.add_column("Start")
+        stbl.add_column("End")
+        stbl.add_column("Days", justify="right")
+        for i, streak in enumerate(top):
+            is_active = active_streak is not None and streak == active_streak
+            rank_label = f"#{i + 1}" + (" (active)" if is_active else "")
+            row_style = "bold green" if is_active else ""
+            stbl.add_row(rank_label, streak[0], streak[-1], str(len(streak)), style=row_style)
+        console.print(stbl)
+
+    # Section 3: Personal bests
+    def _best(key: str, mode: str = "max") -> tuple[float, str] | None:
+        pairs = [(float(r[key]), r["date"]) for r in rows if r[key] is not None]
+        if not pairs:
+            return None
+        return max(pairs, key=lambda x: x[0]) if mode == "max" else min(pairs, key=lambda x: x[0])
+
+    lines: list[str] = []
+    if (v := _best("recovery_pct")):
+        lines.append(f"Best recovery:    [green]{v[0]:.0f}%[/] on {v[1]}")
+    if (v := _best("hrv_ms")):
+        lines.append(f"Best HRV:         [cyan]{v[0]:.0f} ms[/] on {v[1]}")
+    if (v := _best("sleep_duration_hrs")):
+        lines.append(f"Best sleep:       [blue]{v[0]:.1f} hrs[/] on {v[1]}")
+    if (v := _best("rhr_bpm", "min")):
+        lines.append(f"Lowest RHR:       [magenta]{v[0]:.0f} bpm[/] on {v[1]}")
+    if (v := _best("strain")):
+        lines.append(f"Highest strain:   [yellow]{v[0]:.1f}[/] on {v[1]}")
+
+    if lines:
+        console.print(Panel("\n".join(lines), title="Personal Bests", border_style="cyan"))
+
+
 def run_weekly(weeks: int) -> None:
     from collections import defaultdict
 
@@ -1038,7 +1119,7 @@ def run_heatmap(max_weeks: int) -> None:
 # Entry point
 # ---------------------------------------------------------------------------
 
-USAGE = "Usage: whoop_daily.py (setup | today | history [--days N] | heatmap [--weeks N] | correlate [--days N])"
+USAGE = "Usage: whoop_daily.py (setup | today | history [--days N] | heatmap [--weeks N] | correlate [--days N] | trends [--days N] | weekly [--weeks N] | streaks)"
 
 
 def main() -> None:
@@ -1078,6 +1159,8 @@ def main() -> None:
         if "--weeks" in sys.argv:
             weeks = int(sys.argv[sys.argv.index("--weeks") + 1])
         run_weekly(weeks)
+    elif cmd == "streaks":
+        run_streaks()
     else:
         console.print(f"Unknown command: {cmd}", markup=False)
         console.print(USAGE, markup=False)
