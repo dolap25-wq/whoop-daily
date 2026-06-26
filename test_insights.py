@@ -191,3 +191,46 @@ def test_week_start_wednesday():
 
 def test_week_start_saturday():
     assert _week_start("2026-06-27") == date(2026, 6, 22)
+
+
+# ── run_trends smoke tests ─────────────────────────────────────────────────
+
+from whoop_daily import run_trends
+
+
+def _make_full_db(n: int = 15):
+    conn = _make_db()
+    for i in range(n):
+        day = (date(2026, 1, 1) + timedelta(days=i)).isoformat()
+        _insert(conn, day,
+                recovery_pct=80.0 - i * 2.0,
+                hrv_ms=70.0 + i * 0.5,
+                rhr_bpm=55.0 - i * 0.1,
+                sleep_duration_hrs=7.5,
+                strain=10.0 + i * 0.3)
+    return conn
+
+
+def test_run_trends_full_data_no_crash():
+    conn = _make_full_db()
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_trends(None)
+
+
+def test_run_trends_with_days_flag_no_crash():
+    conn = _make_full_db()
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_trends(7)
+
+
+def test_run_trends_empty_db_no_crash():
+    conn = _make_db()
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_trends(None)
+
+
+def test_run_trends_sparse_data_no_crash():
+    # only 3 days — rolling windows should show counts, not crash
+    conn = _make_full_db(3)
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_trends(None)

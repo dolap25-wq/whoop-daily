@@ -801,6 +801,57 @@ def _fmt(value: float | None) -> str:
     return "n/a" if value is None else str(value)
 
 
+def run_trends(days: int | None) -> None:
+    conn = open_db()
+    rows = db.fetch_recent(conn, days) if days is not None else db.fetch_all(conn)
+    if not rows:
+        console.print("No history yet - run `today` a few times first.")
+        return
+
+    console.print(Panel.fit("Whoop – Trends", style="bold cyan"))
+
+    hrv_vals = [r["hrv_ms"] for r in rows]
+    rec_vals = [r["recovery_pct"] for r in rows]
+    rhr_vals = [r["rhr_bpm"] for r in rows]
+
+    # Section 1: Sparklines
+    console.print("\n[bold]Sparklines[/]  (each character = one logged day)\n")
+    console.print(f"  Recovery  {_sparkline(rec_vals)}")
+    console.print(f"  HRV       {_sparkline(hrv_vals)}")
+    console.print(f"  RHR       {_sparkline(rhr_vals)}")
+
+    # Section 2: Rolling averages
+    def _col(vals: list[float | None], window: int, is_recovery: bool = False) -> str:
+        tail_non_none = [v for v in vals[-window:] if v is not None]
+        avg = _rolling_avg(vals, window)
+        if avg is None:
+            return "[dim]n/a[/]"
+        sparse = len(tail_non_none) < window
+        suffix = f" [dim]({len(tail_non_none)}d)[/]" if sparse else ""
+        if is_recovery:
+            s = recovery_style(avg)
+            return f"[{s}]{avg:.1f}[/]{suffix}"
+        return f"{avg:.1f}{suffix}"
+
+    tbl = Table(title="Rolling Averages", show_header=True, header_style="bold")
+    tbl.add_column("Metric")
+    tbl.add_column("7-day", justify="right")
+    tbl.add_column("14-day", justify="right")
+    tbl.add_column("28-day", justify="right")
+    tbl.add_row("Recovery %",
+                _col(rec_vals, 7, True), _col(rec_vals, 14, True), _col(rec_vals, 28, True))
+    tbl.add_row("HRV ms",
+                _col(hrv_vals, 7), _col(hrv_vals, 14), _col(hrv_vals, 28))
+    tbl.add_row("RHR bpm",
+                _col(rhr_vals, 7), _col(rhr_vals, 14), _col(rhr_vals, 28))
+    console.print(tbl)
+
+    # Section 3: Trend direction
+    console.print("\n[bold]Trend  (last 7 days vs prior 7 days)[/]\n")
+    console.print(f"  Recovery:  {_trend_arrow(rec_vals)}")
+    console.print(f"  HRV:       {_trend_arrow(hrv_vals)}")
+
+
 def run_history(n: int) -> None:
     conn = open_db()
     rows = db.fetch_recent(conn, n)
@@ -941,6 +992,11 @@ def main() -> None:
         if "--days" in sys.argv:
             days = int(sys.argv[sys.argv.index("--days") + 1])
         run_correlate(days)
+    elif cmd == "trends":
+        days = None
+        if "--days" in sys.argv:
+            days = int(sys.argv[sys.argv.index("--days") + 1])
+        run_trends(days)
     else:
         console.print(f"Unknown command: {cmd}", markup=False)
         console.print(USAGE, markup=False)
