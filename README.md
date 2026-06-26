@@ -32,7 +32,7 @@ python whoop_daily.py heatmap    # GitHub-style contribution grid, colored by re
 python whoop_daily.py heatmap --weeks 26
 python whoop_daily.py correlate           # correlation analysis across all logged data
 python whoop_daily.py correlate --days 30 # limit to last N days
-python whoop_daily.py trends             # sparklines + rolling averages + trend direction for recovery, HRV, RHR
+python whoop_daily.py trends             # sparklines + rolling averages + trend direction for recovery, HRV
 python whoop_daily.py trends --days 60
 python whoop_daily.py weekly             # week-by-week summary table (avg recovery, HRV, sleep, strain)
 python whoop_daily.py weekly --weeks 12
