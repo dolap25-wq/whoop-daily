@@ -943,7 +943,7 @@ def run_weekly(weeks: int) -> None:
 
     console.print(tbl)
 
-    if week_avgs:
+    if len(week_avgs) >= 2:
         best_ws = max(week_avgs, key=lambda w: week_avgs[w])
         worst_ws = min(week_avgs, key=lambda w: week_avgs[w])
         console.print(
