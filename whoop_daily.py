@@ -801,6 +801,82 @@ def _fmt(value: float | None) -> str:
     return "n/a" if value is None else str(value)
 
 
+def run_weekly(weeks: int) -> None:
+    from collections import defaultdict
+
+    conn = open_db()
+    rows = db.fetch_all(conn)
+    if not rows:
+        console.print("No history yet - run `today` a few times first.")
+        return
+
+    console.print(Panel.fit("Whoop – Weekly Summary", style="bold cyan"))
+
+    week_rows: dict = defaultdict(list)
+    for r in rows:
+        week_rows[_week_start(r["date"])].append(r)
+
+    sorted_weeks = sorted(week_rows.keys(), reverse=True)[:weeks]
+
+    tbl = Table(
+        title=f"Weekly Summary (last {weeks} weeks)",
+        show_header=True,
+        header_style="bold",
+    )
+    tbl.add_column("Week")
+    tbl.add_column("Avg Recovery", justify="right")
+    tbl.add_column("Avg HRV", justify="right")
+    tbl.add_column("Avg Sleep hrs", justify="right")
+    tbl.add_column("Total Strain", justify="right")
+    tbl.add_column("Days", justify="right")
+
+    week_avgs: dict = {}
+
+    for ws in sorted_weeks:
+        week_data = week_rows[ws]
+        days_n = len(week_data)
+
+        rec_w = [float(r["recovery_pct"]) for r in week_data if r["recovery_pct"] is not None]
+        hrv_w = [float(r["hrv_ms"]) for r in week_data if r["hrv_ms"] is not None]
+        slp_w = [float(r["sleep_duration_hrs"]) for r in week_data if r["sleep_duration_hrs"] is not None]
+        str_w = [float(r["strain"]) for r in week_data if r["strain"] is not None]
+
+        avg_rec = sum(rec_w) / len(rec_w) if rec_w else None
+        avg_hrv = sum(hrv_w) / len(hrv_w) if hrv_w else None
+        avg_slp = sum(slp_w) / len(slp_w) if slp_w else None
+        tot_str = sum(str_w) if str_w else None
+
+        if avg_rec is not None and days_n >= 3:
+            week_avgs[ws] = avg_rec
+
+        style = recovery_style(avg_rec)
+        label = f"{ws.strftime('%b')} {ws.day}"
+        tbl.add_row(
+            label,
+            f"[{style}]{avg_rec:.0f}%[/]" if avg_rec is not None else "[dim]n/a[/]",
+            f"{avg_hrv:.0f}" if avg_hrv is not None else "[dim]n/a[/]",
+            f"{avg_slp:.1f}" if avg_slp is not None else "[dim]n/a[/]",
+            f"{tot_str:.1f}" if tot_str is not None else "[dim]n/a[/]",
+            f"{days_n}/7",
+        )
+
+    console.print(tbl)
+
+    if week_avgs:
+        best_ws = max(week_avgs, key=lambda w: week_avgs[w])
+        worst_ws = min(week_avgs, key=lambda w: week_avgs[w])
+        console.print(
+            f"\n  [green]Best week:[/]  "
+            f"{best_ws.strftime('%b')} {best_ws.day}"
+            f" — avg {week_avgs[best_ws]:.0f}% recovery"
+        )
+        console.print(
+            f"  [red]Worst week:[/] "
+            f"{worst_ws.strftime('%b')} {worst_ws.day}"
+            f" — avg {week_avgs[worst_ws]:.0f}% recovery"
+        )
+
+
 def run_trends(days: int | None) -> None:
     conn = open_db()
     rows = db.fetch_recent(conn, days) if days is not None else db.fetch_all(conn)
@@ -997,6 +1073,11 @@ def main() -> None:
         if "--days" in sys.argv:
             days = int(sys.argv[sys.argv.index("--days") + 1])
         run_trends(days)
+    elif cmd == "weekly":
+        weeks = 8
+        if "--weeks" in sys.argv:
+            weeks = int(sys.argv[sys.argv.index("--weeks") + 1])
+        run_weekly(weeks)
     else:
         console.print(f"Unknown command: {cmd}", markup=False)
         console.print(USAGE, markup=False)

@@ -234,3 +234,39 @@ def test_run_trends_sparse_data_no_crash():
     conn = _make_full_db(3)
     with patch("whoop_daily.open_db", return_value=conn):
         run_trends(None)
+
+
+# ── run_weekly smoke tests ─────────────────────────────────────────────────
+
+from whoop_daily import run_weekly
+
+
+def test_run_weekly_full_data_no_crash():
+    conn = _make_full_db(30)
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_weekly(8)
+
+
+def test_run_weekly_empty_db_no_crash():
+    conn = _make_db()
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_weekly(8)
+
+
+def test_run_weekly_single_day_no_crash():
+    conn = _make_db()
+    _insert(conn, "2026-06-20", recovery_pct=72.0, strain=9.0)
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_weekly(4)
+
+
+def test_run_weekly_sparse_week_excluded_from_best_worst():
+    # Only 2 days in the week → should not appear in best/worst footer
+    conn = _make_db()
+    _insert(conn, "2026-06-22", recovery_pct=95.0)  # 2 days this week only
+    _insert(conn, "2026-06-23", recovery_pct=95.0)
+    _insert(conn, "2026-06-15", recovery_pct=40.0)  # 3 days prior week
+    _insert(conn, "2026-06-16", recovery_pct=40.0)
+    _insert(conn, "2026-06-17", recovery_pct=40.0)
+    with patch("whoop_daily.open_db", return_value=conn):
+        run_weekly(8)  # should not crash even with sparse data
